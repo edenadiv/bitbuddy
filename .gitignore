@@ -16,3 +16,6 @@ vendor/
 
 # Executable
 bitbuddy
+
+# Local state file
+bitbuddy.json

@@ -63,3 +63,16 @@ func (b *BitBuddy) Sleep() {
 	}
 	b.UpdatedAt = time.Now()
 }
+
+// UpdateStats is called on a timer to degrade stats over time.
+func (b *BitBuddy) UpdateStats() {
+	b.Hunger += 2
+	if b.Hunger > maxStat {
+		b.Hunger = maxStat
+	}
+	b.Happiness -= 2
+	if b.Happiness < minStat {
+		b.Happiness = minStat
+	}
+	b.UpdatedAt = time.Now()
+}

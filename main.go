@@ -1,14 +1,23 @@
 package main
 
 import (
-	"fmt"
-	"os"
+    "fmt"
+    "math/rand"
+    "os"
+    "time"
 
-	tea "github.com/charmbracelet/bubbletea"
+    tea "github.com/charmbracelet/bubbletea"
 )
 
 func main() {
-	p := tea.NewProgram(initialModel())
+    rand.Seed(time.Now().UnixNano())
+    buddy, err := load()
+    if err != nil {
+        fmt.Println("Error loading saved data:", err)
+        os.Exit(1)
+    }
+
+	p := tea.NewProgram(initialModel(buddy))
 	if _, err := p.Run(); err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
