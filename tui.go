@@ -390,7 +390,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
     // Animated buddy & starfield panel
     art := m.renderBuddy()
-    canvas := m.renderStars(24, 7)
+    canvas := m.renderSky(24, 7, true)
     artLines := strings.Split(strings.TrimRight(art, "\n"), "\n")
     for i := range canvas {
         if i >= len(artLines) {
@@ -563,6 +563,28 @@ func (m *model) initStars() {
             })
         }
     }
+}
+
+// renderSky renders either a blank day sky with a simple sun
+// or a twinkling night starfield.
+func (m model) renderSky(width, height int, day bool) []string {
+    if day {
+        rows := make([]string, height)
+        for i := 0; i < height; i++ {
+            rows[i] = strings.Repeat(" ", width)
+        }
+        // Draw a simple sun in the top-right corner
+        sun := "()"
+        y := 0
+        x := width - len(sun) - 1
+        if x >= 0 && y < height {
+            left := rows[y][:x]
+            right := rows[y][x+len(sun):]
+            rows[y] = left + sun + right
+        }
+        return rows
+    }
+    return m.renderStars(width, height)
 }
 
 func (m model) renderStars(width, height int) []string {
