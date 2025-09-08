@@ -1,18 +1,21 @@
 package main
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/charmbracelet/bubbletea"
 )
 
 type model struct {
-	buddy  *BitBuddy
-	cursor int
+	buddy   *BitBuddy
+	cursor  int
 	choices []string
 }
 
 func initialModel() model {
 	return model{
-		buddy:  NewBitBuddy("BitBuddy"),
+		buddy:   NewBitBuddy("BitBuddy"),
 		choices: []string{"Feed", "Play", "Sleep"},
 	}
 }
@@ -44,31 +47,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	s := "Your BitBuddy!
+	var b strings.Builder
 
-"
-	s += "Hunger: " + renderBar(m.buddy.Hunger) + "
-"
-	s += "Happiness: " + renderBar(m.buddy.Happiness) + "
-"
-	s += "Energy: " + renderBar(m.buddy.Energy) + "
-
-"
+	fmt.Fprintf(&b, "Your BitBuddy!\n\n")
+	fmt.Fprintf(&b, "Hunger:    %s\n", renderBar(m.buddy.Hunger))
+	fmt.Fprintf(&b, "Happiness: %s\n", renderBar(m.buddy.Happiness))
+	fmt.Fprintf(&b, "Energy:    %s\n\n", renderBar(m.buddy.Energy))
 
 	for i, choice := range m.choices {
 		cursor := " "
 		if m.cursor == i {
 			cursor = ">"
 		}
-s += cursor + " " + choice + "
-"
+		fmt.Fprintf(&b, "%s %s\n", cursor, choice)
 	}
 
-	s += "
-Press 'q' to quit.
-"
+	fmt.Fprintf(&b, "\nPress 'q' to quit.\n")
 
-	return s
+	return b.String()
 }
 
 func renderBar(value int) string {
