@@ -26,11 +26,9 @@ var (
 	statusMessageStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.AdaptiveColor{Light: "#04B575", Dark: "#04B575"}). // Mint Green
 		Bold(true)
-	// UI Panel
-	uiPanelStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#38BDF8")).
-		Padding(1, 2)
+    // UI Panel (borderless for ASCII-only rendering)
+    uiPanelStyle = lipgloss.NewStyle().
+        Padding(1, 2)
 	// Menu
 	menuChoiceStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Gray
 	selectedChoiceStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#38BDF8")).Bold(true)
@@ -193,6 +191,7 @@ type model struct {
     // UI toggles
     showHelp bool
     dark     bool
+    day      bool
 
     // Rename flow
     renaming  bool
@@ -222,11 +221,14 @@ func initialModel(buddy *BitBuddy) model {
     s := spinner.New()
     s.Spinner = spinner.Points
     s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#00BFFF"))
+    hour := time.Now().Hour()
+    isDay := hour >= 7 && hour < 19
     m := model{
         buddy:   buddy,
         spinner: s,
         choices: []string{"Feed", "Play", "Sleep", "Rename"},
         dark:    true,
+        day:     isDay,
     }
     setTheme(m.dark)
     return m
@@ -288,6 +290,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         case "t":
             m.dark = !m.dark
             setTheme(m.dark)
+            return m, nil
+        case "d":
+            m.day = !m.day
             return m, nil
         case "p":
             // Cycle pets: Cat -> Corgi -> Bunny -> Cat
@@ -390,7 +395,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
     // Animated buddy & starfield panel
     art := m.renderBuddy()
-    canvas := m.renderSky(24, 7, true)
+    canvas := m.renderSky(24, 7, m.day)
     artLines := strings.Split(strings.TrimRight(art, "\n"), "\n")
     for i := range canvas {
         if i >= len(artLines) {
@@ -424,23 +429,21 @@ func (m model) View() string {
             }
         }
     }
-	artPanel := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("#334155")).
-		Padding(1, 2).
-		Render(strings.Join(canvas, "\n"))
+    artPanel := lipgloss.NewStyle().
+        Padding(1, 2).
+        Render(strings.Join(canvas, "\n"))
 
     // Right side (UI)
     var ui strings.Builder
 
     // Title
-    title := "BitBuddy ✨"
+    title := "BitBuddy"
     if m.dark {
-        title += " · Dark"
+        title += " - Dark"
     } else {
-        title += " · Light"
+        title += " - Light"
     }
-    title += " · " + m.buddy.PetType
+    title += " - " + m.buddy.PetType
     ui.WriteString(titleStyle.Render(title) + "\n")
 
     if m.renaming {
@@ -450,16 +453,17 @@ func (m model) View() string {
     } else if m.showHelp {
         // Help overlay
         ui.WriteString("Keys:\n")
-        ui.WriteString("  ↑/k, ↓/j  Navigate\n")
+        ui.WriteString("  Up/Down, k/j  Navigate\n")
         ui.WriteString("  Enter     Do action\n")
         ui.WriteString("  ?         Toggle help\n")
         ui.WriteString("  t         Toggle theme\n")
+        ui.WriteString("  d         Toggle day/night background\n")
         ui.WriteString("  p         Switch pet (Cat/Corgi/Bunny)\n")
         ui.WriteString("  q         Quit\n\n")
         ui.WriteString("Legend:\n")
         ui.WriteString("  Hunger/Happiness/Energy bars update over time.\n\n")
         ui.WriteString("Files:\n")
-        ui.WriteString("  bitbuddy.json — saved state (ignored by git)\n")
+        ui.WriteString("  bitbuddy.json - saved state (ignored by git)\n")
     } else {
         // Status or Bars
         if m.loading {
@@ -486,7 +490,7 @@ func (m model) View() string {
             }
             ui.WriteString(style.Render(fmt.Sprintf("%s %s", cursor, choice)) + "\n")
         }
-        ui.WriteString(quitStyle.Render("Press '?' for help · 't' theme · 'q' quit"))
+        ui.WriteString(quitStyle.Render("Press '?' for help | 't' theme | 'd' day/night | 'q' quit"))
     }
     uiPanel := uiPanelStyle.Render(ui.String())
 
@@ -512,7 +516,7 @@ func renderBar(label string, value int) string {
 	barStyle := lipgloss.NewStyle().Foreground(barColor).Bold(true)
 	labelStyle := lipgloss.NewStyle().Width(10)
 
-	bar := strings.Repeat("█", value/10) + strings.Repeat("░", 10-value/10)
+    bar := strings.Repeat("#", value/10) + strings.Repeat(".", 10-value/10)
 
 	return fmt.Sprintf("%s %s", labelStyle.Render(label), barStyle.Render(bar))
 }
@@ -668,8 +672,6 @@ func setTheme(dark bool) {
             Background(lipgloss.Color("#7DD3FC")).
             Padding(0, 2).Bold(true).MarginBottom(1)
         uiPanelStyle = lipgloss.NewStyle().
-            Border(lipgloss.RoundedBorder()).
-            BorderForeground(lipgloss.Color("#38BDF8")).
             Padding(1, 2)
         menuChoiceStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
         selectedChoiceStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#38BDF8")).Bold(true)
@@ -682,8 +684,6 @@ func setTheme(dark bool) {
             Background(lipgloss.Color("#FDE68A")). // warm light
             Padding(0, 2).Bold(true).MarginBottom(1)
         uiPanelStyle = lipgloss.NewStyle().
-            Border(lipgloss.RoundedBorder()).
-            BorderForeground(lipgloss.Color("#A3A3A3")).
             Padding(1, 2)
         menuChoiceStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
         selectedChoiceStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#2563EB")).Bold(true)
