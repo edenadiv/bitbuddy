@@ -101,12 +101,30 @@ type model struct {
 	width  int
 	height int
 	frame  int
-	stars  []star
+    stars  []star
+
+    // Action overlays
+    confetti []confettiParticle
+    zzzs     []zzzParticle
 }
 
 type star struct {
-	x, y int
-	on   bool
+    x, y int
+    on   bool
+}
+
+type confettiParticle struct {
+    x, y int
+    dx   int
+    dy   int
+    life int
+    ch   string // already styled glyph
+}
+
+type zzzParticle struct {
+    x, y int
+    life int
+    text string // "z", "zz", "zzz"
 }
 
 func initialModel(buddy *BitBuddy) model {
@@ -147,14 +165,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.choices)-1 {
 				m.cursor++
 			}
-		case "enter":
-			m.loading = true
-			m.currentAction = m.choices[m.cursor]
-			actionCmd := func() tea.Msg {
-				time.Sleep(time.Second * 2)
-				switch m.currentAction {
-				case "Feed":
-					m.buddy.Feed()
+        case "enter":
+            m.loading = true
+            m.currentAction = m.choices[m.cursor]
+            // Start action-specific overlays
+            m.startEffectsForAction()
+            actionCmd := func() tea.Msg {
+                time.Sleep(time.Second * 2)
+                switch m.currentAction {
+                case "Feed":
+                    m.buddy.Feed()
 					return actionMsg{"Yum, that was tasty!"}
 				case "Play":
 					m.buddy.Play()
@@ -168,15 +188,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Sequence(m.spinner.Tick, actionCmd)
 		}
 
-	case actionMsg:
-		m.loading = false
-		m.statusMessage = msg.message
-		m.currentAction = ""
-		clearMsgCmd := func() tea.Msg {
-			time.Sleep(time.Second * 2)
-			return clearStatusMsg{}
-		}
-		return m, clearMsgCmd
+    case actionMsg:
+        m.loading = false
+        m.statusMessage = msg.message
+        m.currentAction = ""
+        // Clear overlays when action completes
+        m.confetti = nil
+        m.zzzs = nil
+        clearMsgCmd := func() tea.Msg {
+            time.Sleep(time.Second * 2)
+            return clearStatusMsg{}
+        }
+        return m, clearMsgCmd
 
 	case clearStatusMsg:
 		m.statusMessage = ""
@@ -200,6 +223,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
                 m.stars[i].on = !m.stars[i].on
             }
         }
+        // Update overlays for current action
+        if m.loading {
+            switch m.currentAction {
+            case "Play":
+                m.updateConfetti()
+            case "Sleep":
+                m.updateZzz()
+            }
+        }
         return m, animTick()
     }
     return m, nil
@@ -211,22 +243,43 @@ func (m model) View() string {
 	art := m.renderBuddy()
 	canvas := m.renderStars(24, 7)
 	artLines := strings.Split(strings.TrimRight(art, "\n"), "\n")
-	for i := range canvas {
-		if i >= len(artLines) {
-			break
-		}
-		line := artLines[i]
-		pad := 0
+    for i := range canvas {
+        if i >= len(artLines) {
+            break
+        }
+        line := artLines[i]
+        pad := 0
 		if w := len(canvas[i]); w > len(line) {
 			pad = (w - len(line)) / 2
 		}
 		if pad < 0 {
 			pad = 0
 		}
-		if pad+len(line) <= len(canvas[i]) {
-			canvas[i] = canvas[i][:pad] + line + canvas[i][pad+len(line):]
-		}
-	}
+        if pad+len(line) <= len(canvas[i]) {
+            canvas[i] = canvas[i][:pad] + line + canvas[i][pad+len(line):]
+        }
+    }
+    // Overlays: confetti and Zzz over the art
+    for _, p := range m.confetti {
+        if p.y >= 0 && p.y < len(canvas) {
+            row := canvas[p.y]
+            if p.x >= 0 && p.x < len(row) {
+                left := row[:p.x]
+                right := row[p.x+1:]
+                canvas[p.y] = left + p.ch + right
+            }
+        }
+    }
+    for _, z := range m.zzzs {
+        if z.y >= 0 && z.y < len(canvas) {
+            row := canvas[z.y]
+            if z.x >= 0 && z.x < len(row) {
+                left := row[:z.x]
+                right := row[z.x+1:]
+                canvas[z.y] = left + lipgloss.NewStyle().Foreground(lipgloss.Color("#94A3B8")).Render(z.text) + right
+            }
+        }
+    }
 	artPanel := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("#334155")).
@@ -380,5 +433,118 @@ func (m model) renderBuddy() string {
         return idle2
     default:
         return idle3
+    }
+}
+
+// -- OVERLAYS: CONFETTI & ZZZ --
+func (m *model) startEffectsForAction() {
+    switch m.currentAction {
+    case "Play":
+        m.initConfetti()
+    case "Sleep":
+        m.initZzz()
+    default:
+        m.confetti = nil
+        m.zzzs = nil
+    }
+}
+
+func (m *model) initConfetti() {
+    m.confetti = nil
+    w, h := 24, 7
+    colors := []string{"#F472B6", "#F59E0B", "#34D399", "#60A5FA", "#A78BFA"}
+    glyphs := []string{"*", "•", "+", "✦"}
+    for i := 0; i < 22; i++ {
+        c := colors[rand.Intn(len(colors))]
+        g := glyphs[rand.Intn(len(glyphs))]
+        styled := lipgloss.NewStyle().Foreground(lipgloss.Color(c)).Bold(true).Render(g)
+        p := confettiParticle{
+            x:   rand.Intn(w),
+            y:   rand.Intn(2), // top rows
+            dx:  rand.Intn(3) - 1,
+            dy:  1,
+            life: 8 + rand.Intn(7),
+            ch:  styled,
+        }
+        m.confetti = append(m.confetti, p)
+    }
+}
+
+func (m *model) updateConfetti() {
+    w, h := 24, 7
+    next := m.confetti[:0]
+    for i := range m.confetti {
+        p := m.confetti[i]
+        p.x += p.dx
+        p.y += p.dy
+        p.life--
+        if p.x < 0 || p.x >= w || p.y < 0 || p.y >= h || p.life <= 0 {
+            continue
+        }
+        // small horizontal jitter
+        if rand.Intn(3) == 0 {
+            p.x += (rand.Intn(3) - 1)
+            if p.x < 0 {
+                p.x = 0
+            }
+            if p.x >= w {
+                p.x = w - 1
+            }
+        }
+        next = append(next, p)
+    }
+    m.confetti = next
+    // Occasionally spawn new pieces while playing
+    if len(m.confetti) < 18 {
+        c := []string{"#F472B6", "#F59E0B", "#34D399", "#60A5FA", "#A78BFA"}
+        g := []string{"*", "•", "+", "✦"}
+        styled := lipgloss.NewStyle().Foreground(lipgloss.Color(c[rand.Intn(len(c))])).Bold(true).Render(g[rand.Intn(len(g))])
+        m.confetti = append(m.confetti, confettiParticle{
+            x:   rand.Intn(24),
+            y:   0,
+            dx:  rand.Intn(3) - 1,
+            dy:  1,
+            life: 10,
+            ch:  styled,
+        })
+    }
+}
+
+func (m *model) initZzz() {
+    m.zzzs = nil
+    // start near the head region of the buddy art
+    startX := 12
+    startY := 1
+    m.zzzs = append(m.zzzs, zzzParticle{x: startX, y: startY, life: 14, text: "z"})
+}
+
+func (m *model) updateZzz() {
+    w, _ := 24, 7
+    next := m.zzzs[:0]
+    for i := range m.zzzs {
+        z := m.zzzs[i]
+        // drift up-right slowly
+        if rand.Intn(2) == 0 {
+            z.x += 1
+        }
+        if rand.Intn(2) == 0 {
+            z.y -= 1
+        }
+        if z.x >= w {
+            z.x = w - 1
+        }
+        z.life--
+        if z.y < 0 || z.life <= 0 {
+            continue
+        }
+        next = append(next, z)
+    }
+    m.zzzs = next
+    // spawn new z every few frames, up to a small count
+    if len(m.zzzs) < 4 && m.frame%3 == 0 {
+        startX := 12 + rand.Intn(3) - 1
+        startY := 2
+        texts := []string{"z", "zz", "zzz"}
+        m.zzzs = append(m.zzzs, zzzParticle{x: startX, y: startY, life: 14, text: texts[rand.Intn(len(texts))]})
     }
 }
