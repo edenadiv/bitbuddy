@@ -2,6 +2,11 @@ package main
 
 import "time"
 
+const (
+	maxStat = 100
+	minStat = 0
+)
+
 // BitBuddy represents the state of our digital pet.
 type BitBuddy struct {
 	Name      string
@@ -22,4 +27,39 @@ func NewBitBuddy(name string) *BitBuddy {
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
+}
+
+// Feed decreases hunger and slightly increases happiness.
+func (b *BitBuddy) Feed() {
+	b.Hunger -= 20
+	if b.Hunger < minStat {
+		b.Hunger = minStat
+	}
+	b.Happiness += 5
+	if b.Happiness > maxStat {
+		b.Happiness = maxStat
+	}
+	b.UpdatedAt = time.Now()
+}
+
+// Play increases happiness but uses energy.
+func (b *BitBuddy) Play() {
+	b.Happiness += 20
+	if b.Happiness > maxStat {
+		b.Happiness = maxStat
+	}
+	b.Energy -= 15
+	if b.Energy < minStat {
+		b.Energy = minStat
+	}
+	b.UpdatedAt = time.Now()
+}
+
+// Sleep restores energy.
+func (b *BitBuddy) Sleep() {
+	b.Energy += 40
+	if b.Energy > maxStat {
+		b.Energy = maxStat
+	}
+	b.UpdatedAt = time.Now()
 }
