@@ -38,47 +38,47 @@ var (
 	quitStyle = lipgloss.NewStyle().MarginTop(1).Foreground(lipgloss.Color("240"))
 )
 
-// -- ASCII ART FRAMES --
+// -- ASCII ART FRAMES (ASCII-only for stability) --
 const (
-	idle1 = "" +
-		"  /\\_/\\\n" +
-		" ( •.• )\n" +
-		"  > ^ <\n"
-	idle2 = "" +
-		"  /\\_/\\\n" +
-		" ( •_• )\n" +
-		"  > ^ <\n"
-	idle3 = "" +
-		"  /\\_/\\\n" +
-		" ( -_- )\n" +
-		"  > ^ <\n"
+    idle1 = "" +
+        "  /\\_/\\    \n" +
+        " ( o.o )    \n" +
+        "  > ^ <     \n"
+    idle2 = "" +
+        "  /\\_/\\    \n" +
+        " ( o_o )    \n" +
+        "  > ^ <     \n"
+    idle3 = "" +
+        "  /\\_/\\    \n" +
+        " ( -_- )    \n" +
+        "  > ^ <     \n"
 
-	eat1 = "" +
-		"  /\\_/\\\n" +
-		" ( •.• )\n" +
-		"  > w <\n"
-	eat2 = "" +
-		"  /\\_/\\\n" +
-		" ( •.• )\n" +
-		"  > o <\n"
+    eat1 = "" +
+        "  /\\_/\\    \n" +
+        " ( o.o )    \n" +
+        "  > w <     \n"
+    eat2 = "" +
+        "  /\\_/\\    \n" +
+        " ( o.o )    \n" +
+        "  > o <     \n"
 
-	play1 = "" +
-		"  /\\_/\\\n" +
-		" ( ^.^ )\n" +
-		"  > ^ <\n"
-	play2 = "" +
-		"  /\\_/\\\n" +
-		" ( ^o^ )\n" +
-		"  > ^ <\n"
+    play1 = "" +
+        "  /\\_/\\    \n" +
+        " ( ^.^ )    \n" +
+        "  > ^ <     \n"
+    play2 = "" +
+        "  /\\_/\\    \n" +
+        " ( ^o^ )    \n" +
+        "  > ^ <     \n"
 
-	sleep1 = "" +
-		"  /\\_/\\\n" +
-		" ( -.- ) z\n" +
-		"  > ^ <\n"
-	sleep2 = "" +
-		"  /\\_/\\\n" +
-		" ( -.- ) zz\n" +
-		"  > ^ <\n"
+    sleep1 = "" +
+        "  /\\_/\\    \n" +
+        " ( -.- ) z  \n" +
+        "  > ^ <     \n"
+    sleep2 = "" +
+        "  /\\_/\\    \n" +
+        " ( -.- ) zz \n" +
+        "  > ^ <     \n"
 )
 
 // -- MESSAGES --
@@ -118,7 +118,7 @@ type confettiParticle struct {
     dx   int
     dy   int
     life int
-    ch   string // already styled glyph
+    ch   string // ASCII glyph
 }
 
 type zzzParticle struct {
@@ -276,7 +276,7 @@ func (m model) View() string {
             if z.x >= 0 && z.x < len(row) {
                 left := row[:z.x]
                 right := row[z.x+1:]
-                canvas[z.y] = left + lipgloss.NewStyle().Foreground(lipgloss.Color("#94A3B8")).Render(z.text) + right
+                canvas[z.y] = left + z.text + right
             }
         }
     }
@@ -378,21 +378,15 @@ func (m model) renderStars(width, height int) []string {
     for i := 0; i < height; i++ {
         rows[i] = strings.Repeat(" ", width)
     }
-    dot := lipgloss.NewStyle().Foreground(lipgloss.Color("#94A3B8")).Render("·")
-    bright := lipgloss.NewStyle().Foreground(lipgloss.Color("#E5E7EB")).Bold(true).Render("•")
     for _, s := range m.stars {
         if s.y >= height || s.x >= width {
             continue
         }
-        ch := dot
-        if s.on {
-            ch = bright
-        }
-        if s.x < len(rows[s.y]) {
-            left := rows[s.y][:s.x]
-            right := rows[s.y][s.x+1:]
-            rows[s.y] = left + ch + right
-        }
+        ch := "."
+        if s.on { ch = "*" }
+        left := rows[s.y][:s.x]
+        right := rows[s.y][s.x+1:]
+        rows[s.y] = left + ch + right
     }
     return rows
 }
@@ -452,19 +446,16 @@ func (m *model) startEffectsForAction() {
 func (m *model) initConfetti() {
     m.confetti = nil
     w := 24
-    colors := []string{"#F472B6", "#F59E0B", "#34D399", "#60A5FA", "#A78BFA"}
-    glyphs := []string{"*", "•", "+", "✦"}
+    glyphs := []string{"*", "+", "x"}
     for i := 0; i < 22; i++ {
-        c := colors[rand.Intn(len(colors))]
         g := glyphs[rand.Intn(len(glyphs))]
-        styled := lipgloss.NewStyle().Foreground(lipgloss.Color(c)).Bold(true).Render(g)
         p := confettiParticle{
             x:   rand.Intn(w),
             y:   rand.Intn(2), // top rows
             dx:  rand.Intn(3) - 1,
             dy:  1,
             life: 8 + rand.Intn(7),
-            ch:  styled,
+            ch:  g,
         }
         m.confetti = append(m.confetti, p)
     }
@@ -496,16 +487,14 @@ func (m *model) updateConfetti() {
     m.confetti = next
     // Occasionally spawn new pieces while playing
     if len(m.confetti) < 18 {
-        c := []string{"#F472B6", "#F59E0B", "#34D399", "#60A5FA", "#A78BFA"}
-        g := []string{"*", "•", "+", "✦"}
-        styled := lipgloss.NewStyle().Foreground(lipgloss.Color(c[rand.Intn(len(c))])).Bold(true).Render(g[rand.Intn(len(g))])
+        g := []string{"*", "+", "x"}
         m.confetti = append(m.confetti, confettiParticle{
             x:   rand.Intn(24),
             y:   0,
             dx:  rand.Intn(3) - 1,
             dy:  1,
             life: 10,
-            ch:  styled,
+            ch:  g[rand.Intn(len(g))],
         })
     }
 }
