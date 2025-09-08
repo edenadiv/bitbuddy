@@ -19,19 +19,23 @@ func save(buddy *BitBuddy) error {
 // load reads the state from the JSON file and returns a BitBuddy.
 // If the file doesn't exist, it creates a new BitBuddy.
 func load() (*BitBuddy, error) {
-	data, err := os.ReadFile(saveFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// If file doesn't exist, create a new BitBuddy
-			return NewBitBuddy("BitBuddy"), nil
-		}
-		return nil, err
-	}
+    data, err := os.ReadFile(saveFile)
+    if err != nil {
+        if os.IsNotExist(err) {
+            // If file doesn't exist, create a new BitBuddy
+            return NewBitBuddy("BitBuddy"), nil
+        }
+        return nil, err
+    }
 
-	var buddy BitBuddy
-	err = json.Unmarshal(data, &buddy)
-	if err != nil {
-		return nil, err
-	}
-	return &buddy, nil
+    var buddy BitBuddy
+    err = json.Unmarshal(data, &buddy)
+    if err != nil {
+        return nil, err
+    }
+    // Backward compatibility: default pet type if missing
+    if buddy.PetType == "" {
+        buddy.PetType = "Cat"
+    }
+    return &buddy, nil
 }

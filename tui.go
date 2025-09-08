@@ -40,45 +40,87 @@ var (
 
 // -- ASCII ART FRAMES (ASCII-only for stability) --
 const (
-    idle1 = "" +
+    // Cat frames
+    catIdle1 = "" +
         "  /\\_/\\    \n" +
         " ( o.o )    \n" +
         "  > ^ <     \n"
-    idle2 = "" +
+    catIdle2 = "" +
         "  /\\_/\\    \n" +
         " ( o_o )    \n" +
         "  > ^ <     \n"
-    idle3 = "" +
+    catIdle3 = "" +
         "  /\\_/\\    \n" +
         " ( -_- )    \n" +
         "  > ^ <     \n"
 
-    eat1 = "" +
+    catEat1 = "" +
         "  /\\_/\\    \n" +
         " ( o.o )    \n" +
         "  > w <     \n"
-    eat2 = "" +
+    catEat2 = "" +
         "  /\\_/\\    \n" +
         " ( o.o )    \n" +
         "  > o <     \n"
 
-    play1 = "" +
+    catPlay1 = "" +
         "  /\\_/\\    \n" +
         " ( ^.^ )    \n" +
         "  > ^ <     \n"
-    play2 = "" +
+    catPlay2 = "" +
         "  /\\_/\\    \n" +
         " ( ^o^ )    \n" +
         "  > ^ <     \n"
 
-    sleep1 = "" +
+    catSleep1 = "" +
         "  /\\_/\\    \n" +
         " ( -.- ) z  \n" +
         "  > ^ <     \n"
-    sleep2 = "" +
+    catSleep2 = "" +
         "  /\\_/\\    \n" +
         " ( -.- ) zz \n" +
         "  > ^ <     \n"
+
+    // Corgi frames (distinct muzzle and tiny legs)
+    dogIdle1 = "" +
+        "  /\\_/\\    \n" +
+        " ( o.o )>   \n" +
+        "  |_ _|     \n"
+    dogIdle2 = "" +
+        "  /\\_/\\    \n" +
+        " ( o_o )>   \n" +
+        "  |_ _|     \n"
+    dogIdle3 = "" +
+        "  /\\_/\\    \n" +
+        " ( -_- )>   \n" +
+        "  |_ _|     \n"
+
+    dogEat1 = "" +
+        "  /\\_/\\    \n" +
+        " ( o.o )>   \n" +
+        "  |\\_/|     \n"
+    dogEat2 = "" +
+        "  /\\_/\\    \n" +
+        " ( o.o )>   \n" +
+        "  | o |     \n"
+
+    dogPlay1 = "" +
+        "  /\\_/\\    \n" +
+        " ( ^.^ )>   \n" +
+        "  |_ _|     \n"
+    dogPlay2 = "" +
+        "  /\\_/\\    \n" +
+        " ( ^o^ )>   \n" +
+        "  |_ _|     \n"
+
+    dogSleep1 = "" +
+        "  /\\_/\\    \n" +
+        " ( -.- )> z \n" +
+        "  |_ _|     \n"
+    dogSleep2 = "" +
+        "  /\\_/\\    \n" +
+        " ( -.- )>zz \n" +
+        "  |_ _|     \n"
 )
 
 // -- MESSAGES --
@@ -170,6 +212,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         case "t":
             m.dark = !m.dark
             setTheme(m.dark)
+            return m, nil
+        case "p":
+            if m.buddy.PetType == "Corgi" {
+                m.buddy.PetType = "Cat"
+            } else {
+                m.buddy.PetType = "Corgi"
+            }
+            m.statusMessage = "Pet: " + m.buddy.PetType
             return m, nil
         case "up", "k":
             if m.cursor > 0 {
@@ -310,6 +360,7 @@ func (m model) View() string {
     } else {
         title += " · Light"
     }
+    title += " · " + m.buddy.PetType
     ui.WriteString(titleStyle.Render(title) + "\n")
 
     if m.showHelp {
@@ -319,6 +370,7 @@ func (m model) View() string {
         ui.WriteString("  Enter     Do action\n")
         ui.WriteString("  ?         Toggle help\n")
         ui.WriteString("  t         Toggle theme\n")
+        ui.WriteString("  p         Switch pet (Cat/Corgi)\n")
         ui.WriteString("  q         Quit\n\n")
         ui.WriteString("Legend:\n")
         ui.WriteString("  Hunger/Happiness/Energy bars update over time.\n\n")
@@ -425,41 +477,44 @@ func (m model) renderStars(width, height int) []string {
 }
 
 func (m model) renderBuddy() string {
+    isDog := m.buddy != nil && strings.EqualFold(m.buddy.PetType, "Corgi")
     if m.loading {
         switch m.currentAction {
         case "Feed":
-            if m.frame%2 == 0 {
-                return eat1
+            if isDog {
+                if m.frame%2 == 0 { return dogEat1 }
+                return dogEat2
             }
-            return eat2
+            if m.frame%2 == 0 { return catEat1 }
+            return catEat2
         case "Play":
-            if m.frame%2 == 0 {
-                return play1
+            if isDog {
+                if m.frame%2 == 0 { return dogPlay1 }
+                return dogPlay2
             }
-            return play2
+            if m.frame%2 == 0 { return catPlay1 }
+            return catPlay2
         case "Sleep":
-            if m.frame%2 == 0 {
-                return sleep1
+            if isDog {
+                if m.frame%2 == 0 { return dogSleep1 }
+                return dogSleep2
             }
-            return sleep2
+            if m.frame%2 == 0 { return catSleep1 }
+            return catSleep2
         default:
-            switch m.frame % 3 {
-            case 0:
-                return idle1
-            case 1:
-                return idle2
-            default:
-                return idle3
-            }
+            // fall through to idle
         }
     }
     switch m.frame % 3 {
     case 0:
-        return idle1
+        if isDog { return dogIdle1 }
+        return catIdle1
     case 1:
-        return idle2
+        if isDog { return dogIdle2 }
+        return catIdle2
     default:
-        return idle3
+        if isDog { return dogIdle3 }
+        return catIdle3
     }
 }
 
