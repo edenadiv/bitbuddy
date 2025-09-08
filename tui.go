@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	ea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+    "github.com/charmbracelet/bubbles/spinner"
+    tea "github.com/charmbracelet/bubbletea"
+    "github.com/charmbracelet/lipgloss"
 )
 
 // -- STYLES ---
@@ -451,7 +451,7 @@ func (m *model) startEffectsForAction() {
 
 func (m *model) initConfetti() {
     m.confetti = nil
-    w, h := 24, 7
+    w := 24
     colors := []string{"#F472B6", "#F59E0B", "#34D399", "#60A5FA", "#A78BFA"}
     glyphs := []string{"*", "•", "+", "✦"}
     for i := 0; i < 22; i++ {
