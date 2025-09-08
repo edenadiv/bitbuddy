@@ -106,6 +106,10 @@ type model struct {
     // Action overlays
     confetti []confettiParticle
     zzzs     []zzzParticle
+
+    // UI toggles
+    showHelp bool
+    dark     bool
 }
 
 type star struct {
@@ -128,14 +132,17 @@ type zzzParticle struct {
 }
 
 func initialModel(buddy *BitBuddy) model {
-	s := spinner.New()
-	s.Spinner = spinner.Points
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#00BFFF"))
-	return model{
-		buddy:   buddy,
-		spinner: s,
-		choices: []string{"Feed", "Play", "Sleep"},
-	}
+    s := spinner.New()
+    s.Spinner = spinner.Points
+    s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#00BFFF"))
+    m := model{
+        buddy:   buddy,
+        spinner: s,
+        choices: []string{"Feed", "Play", "Sleep"},
+        dark:    true,
+    }
+    setTheme(m.dark)
+    return m
 }
 
 func (m model) Init() tea.Cmd {
@@ -153,15 +160,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         if m.loading {
             return m, nil
         }
-		switch msg.String() {
-		case "ctrl+c", "q":
-			_ = save(m.buddy) // Save on quit
-			return m, tea.Quit
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		case "down", "j":
+        switch msg.String() {
+        case "ctrl+c", "q":
+            _ = save(m.buddy) // Save on quit
+            return m, tea.Quit
+        case "?", "h":
+            m.showHelp = !m.showHelp
+            return m, nil
+        case "t":
+            m.dark = !m.dark
+            setTheme(m.dark)
+            return m, nil
+        case "up", "k":
+            if m.cursor > 0 {
+                m.cursor--
+            }
+        case "down", "j":
 			if m.cursor < len(m.choices)-1 {
 				m.cursor++
 			}
@@ -239,9 +253,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // -- VIEW --
 func (m model) View() string {
-	// Animated buddy & starfield panel
-	art := m.renderBuddy()
-	canvas := m.renderStars(24, 7)
+    // Animated buddy & starfield panel
+    art := m.renderBuddy()
+    canvas := m.renderStars(24, 7)
 	artLines := strings.Split(strings.TrimRight(art, "\n"), "\n")
     for i := range canvas {
         if i >= len(artLines) {
@@ -286,37 +300,56 @@ func (m model) View() string {
 		Padding(1, 2).
 		Render(strings.Join(canvas, "\n"))
 
-	// Right side (UI)
-	var ui strings.Builder
+    // Right side (UI)
+    var ui strings.Builder
 
-	// Title
-	ui.WriteString(titleStyle.Render("BitBuddy ✨") + "\n")
+    // Title
+    title := "BitBuddy ✨"
+    if m.dark {
+        title += " · Dark"
+    } else {
+        title += " · Light"
+    }
+    ui.WriteString(titleStyle.Render(title) + "\n")
 
-	// Status or Bars
-	if m.loading {
-		ui.WriteString(fmt.Sprintf("%s %s...", m.spinner.View(), m.currentAction))
-	} else if m.statusMessage != "" {
-		ui.WriteString(statusMessageStyle.Render(m.statusMessage))
-	} else {
-		ui.WriteString(renderBar("Hunger", m.buddy.Hunger) + "\n")
-		ui.WriteString(renderBar("Happiness", m.buddy.Happiness) + "\n")
-		ui.WriteString(renderBar("Energy", m.buddy.Energy))
-	}
-	ui.WriteString("\n\n")
+    if m.showHelp {
+        // Help overlay
+        ui.WriteString("Keys:\n")
+        ui.WriteString("  ↑/k, ↓/j  Navigate\n")
+        ui.WriteString("  Enter     Do action\n")
+        ui.WriteString("  ?         Toggle help\n")
+        ui.WriteString("  t         Toggle theme\n")
+        ui.WriteString("  q         Quit\n\n")
+        ui.WriteString("Legend:\n")
+        ui.WriteString("  Hunger/Happiness/Energy bars update over time.\n\n")
+        ui.WriteString("Files:\n")
+        ui.WriteString("  bitbuddy.json — saved state (ignored by git)\n")
+    } else {
+        // Status or Bars
+        if m.loading {
+            ui.WriteString(fmt.Sprintf("%s %s...", m.spinner.View(), m.currentAction))
+        } else if m.statusMessage != "" {
+            ui.WriteString(statusMessageStyle.Render(m.statusMessage))
+        } else {
+            ui.WriteString(renderBar("Hunger", m.buddy.Hunger) + "\n")
+            ui.WriteString(renderBar("Happiness", m.buddy.Happiness) + "\n")
+            ui.WriteString(renderBar("Energy", m.buddy.Energy))
+        }
+        ui.WriteString("\n\n")
 
-	// Menu
-	for i, choice := range m.choices {
-		style := menuChoiceStyle
-		cursor := " "
-		if m.cursor == i {
-			style = selectedChoiceStyle
-			cursor = ">"
-		}
-		ui.WriteString(style.Render(fmt.Sprintf("%s %s", cursor, choice)) + "\n")
-	}
-
-	ui.WriteString(quitStyle.Render("Press 'q' to quit."))
-	uiPanel := uiPanelStyle.Render(ui.String())
+        // Menu
+        for i, choice := range m.choices {
+            style := menuChoiceStyle
+            cursor := " "
+            if m.cursor == i {
+                style = selectedChoiceStyle
+                cursor = ">"
+            }
+            ui.WriteString(style.Render(fmt.Sprintf("%s %s", cursor, choice)) + "\n")
+        }
+        ui.WriteString(quitStyle.Render("Press '?' for help · 't' theme · 'q' quit"))
+    }
+    uiPanel := uiPanelStyle.Render(ui.String())
 
 	return docStyle.Render(lipgloss.JoinHorizontal(lipgloss.Top, artPanel, uiPanel))
 }
@@ -427,6 +460,39 @@ func (m model) renderBuddy() string {
         return idle2
     default:
         return idle3
+    }
+}
+
+// -- THEME --
+func setTheme(dark bool) {
+    if dark {
+        titleStyle = lipgloss.NewStyle().
+            Foreground(lipgloss.Color("#0A0A0B")).
+            Background(lipgloss.Color("#7DD3FC")).
+            Padding(0, 2).Bold(true).MarginBottom(1)
+        uiPanelStyle = lipgloss.NewStyle().
+            Border(lipgloss.RoundedBorder()).
+            BorderForeground(lipgloss.Color("#38BDF8")).
+            Padding(1, 2)
+        menuChoiceStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+        selectedChoiceStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#38BDF8")).Bold(true)
+        quitStyle = lipgloss.NewStyle().MarginTop(1).Foreground(lipgloss.Color("240"))
+        docStyle = lipgloss.NewStyle().Padding(1, 2, 1, 2)
+        statusMessageStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+    } else {
+        titleStyle = lipgloss.NewStyle().
+            Foreground(lipgloss.Color("#0A0A0B")).
+            Background(lipgloss.Color("#FDE68A")). // warm light
+            Padding(0, 2).Bold(true).MarginBottom(1)
+        uiPanelStyle = lipgloss.NewStyle().
+            Border(lipgloss.RoundedBorder()).
+            BorderForeground(lipgloss.Color("#A3A3A3")).
+            Padding(1, 2)
+        menuChoiceStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
+        selectedChoiceStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#2563EB")).Bold(true)
+        quitStyle = lipgloss.NewStyle().MarginTop(1).Foreground(lipgloss.Color("238"))
+        docStyle = lipgloss.NewStyle().Padding(1, 2, 1, 2)
+        statusMessageStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#059669")).Bold(true)
     }
 }
 
