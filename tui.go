@@ -152,6 +152,10 @@ type model struct {
     // UI toggles
     showHelp bool
     dark     bool
+
+    // Rename flow
+    renaming  bool
+    nameInput string
 }
 
 type star struct {
@@ -180,7 +184,7 @@ func initialModel(buddy *BitBuddy) model {
     m := model{
         buddy:   buddy,
         spinner: s,
-        choices: []string{"Feed", "Play", "Sleep"},
+        choices: []string{"Feed", "Play", "Sleep", "Rename"},
         dark:    true,
     }
     setTheme(m.dark)
@@ -199,6 +203,37 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         m.initStars()
         return m, nil
     case tea.KeyMsg:
+        // Handle rename input mode first
+        if m.renaming {
+            switch msg.Type {
+            case tea.KeyEnter:
+                trimmed := strings.TrimSpace(m.nameInput)
+                if trimmed != "" {
+                    m.buddy.Name = trimmed
+                    _ = save(m.buddy)
+                    m.statusMessage = "Renamed to: " + trimmed
+                }
+                m.renaming = false
+                m.nameInput = ""
+                return m, nil
+            case tea.KeyEsc:
+                m.renaming = false
+                m.nameInput = ""
+                return m, nil
+            case tea.KeyBackspace, tea.KeyCtrlH:
+                if len(m.nameInput) > 0 {
+                    m.nameInput = m.nameInput[:len(m.nameInput)-1]
+                }
+                return m, nil
+            default:
+                // Append regular characters
+                s := msg.String()
+                if len(s) == 1 && s >= " " && s <= "~" { // printable ASCII
+                    m.nameInput += s
+                }
+                return m, nil
+            }
+        }
         if m.loading {
             return m, nil
         }
@@ -230,8 +265,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
         case "enter":
-            m.loading = true
             m.currentAction = m.choices[m.cursor]
+            if m.currentAction == "Rename" {
+                m.renaming = true
+                m.nameInput = m.buddy.Name
+                return m, nil
+            }
+            m.loading = true
             // Start action-specific overlays
             m.startEffectsForAction()
             actionCmd := func() tea.Msg {
@@ -239,17 +279,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
                 switch m.currentAction {
                 case "Feed":
                     m.buddy.Feed()
-					return actionMsg{"Yum, that was tasty!"}
-				case "Play":
-					m.buddy.Play()
-					return actionMsg{"Weee, that was fun!"}
-				case "Sleep":
-					m.buddy.Sleep()
-					return actionMsg{"Zzzz..."}
-				}
-				return nil
-			}
-			return m, tea.Sequence(m.spinner.Tick, actionCmd)
+                    return actionMsg{"Yum, that was tasty!"}
+                case "Play":
+                    m.buddy.Play()
+                    return actionMsg{"Weee, that was fun!"}
+                case "Sleep":
+                    m.buddy.Sleep()
+                    return actionMsg{"Zzzz..."}
+                }
+                return nil
+            }
+            return m, tea.Sequence(m.spinner.Tick, actionCmd)
 		}
 
     case actionMsg:
@@ -306,21 +346,16 @@ func (m model) View() string {
     // Animated buddy & starfield panel
     art := m.renderBuddy()
     canvas := m.renderStars(24, 7)
-	artLines := strings.Split(strings.TrimRight(art, "\n"), "\n")
+    artLines := strings.Split(strings.TrimRight(art, "\n"), "\n")
     for i := range canvas {
         if i >= len(artLines) {
             break
         }
         line := artLines[i]
-        pad := 0
-		if w := len(canvas[i]); w > len(line) {
-			pad = (w - len(line)) / 2
-		}
-		if pad < 0 {
-			pad = 0
-		}
-        if pad+len(line) <= len(canvas[i]) {
-            canvas[i] = canvas[i][:pad] + line + canvas[i][pad+len(line):]
+        // Place buddy near the left edge with a small inset
+        inset := 1
+        if inset+len(line) <= len(canvas[i]) {
+            canvas[i] = canvas[i][:inset] + line + canvas[i][inset+len(line):]
         }
     }
     // Overlays: confetti and Zzz over the art
@@ -363,7 +398,11 @@ func (m model) View() string {
     title += " · " + m.buddy.PetType
     ui.WriteString(titleStyle.Render(title) + "\n")
 
-    if m.showHelp {
+    if m.renaming {
+        ui.WriteString("Rename Pet (Enter to save, Esc to cancel)\n\n")
+        ui.WriteString("> " + m.nameInput + "\n\n")
+        ui.WriteString("Tip: Names are saved to bitbuddy.json")
+    } else if m.showHelp {
         // Help overlay
         ui.WriteString("Keys:\n")
         ui.WriteString("  ↑/k, ↓/j  Navigate\n")
