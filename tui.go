@@ -121,6 +121,47 @@ const (
         "  /\\_/\\    \n" +
         " ( -.- )>zz \n" +
         "  |_ _|     \n"
+
+    // Bunny frames (tall ears)
+    bunIdle1 = "" +
+        "  (\\_/ )    \n" +
+        "  ( o.o)     \n" +
+        "  / > <\\    \n"
+    bunIdle2 = "" +
+        "  (\\_/ )    \n" +
+        "  ( o_o)     \n" +
+        "  / > <\\    \n"
+    bunIdle3 = "" +
+        "  (\\_/ )    \n" +
+        "  ( -_-)     \n" +
+        "  / > <\\    \n"
+
+    bunEat1 = "" +
+        "  (\\_/ )    \n" +
+        "  ( o.o)     \n" +
+        "  / w w\\    \n"
+    bunEat2 = "" +
+        "  (\\_/ )    \n" +
+        "  ( o.o)     \n" +
+        "  / o o\\    \n"
+
+    bunPlay1 = "" +
+        "  (\\_/ )    \n" +
+        "  ( ^.^)     \n" +
+        "  / > <\\    \n"
+    bunPlay2 = "" +
+        "  (\\_/ )    \n" +
+        "  ( ^o^)     \n" +
+        "  / > <\\    \n"
+
+    bunSleep1 = "" +
+        "  (\\_/ )    \n" +
+        "  ( -.-) z   \n" +
+        "  / > <\\    \n"
+    bunSleep2 = "" +
+        "  (\\_/ )    \n" +
+        "  ( -.-) zz  \n" +
+        "  / > <\\    \n"
 )
 
 // -- MESSAGES --
@@ -249,10 +290,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             setTheme(m.dark)
             return m, nil
         case "p":
-            if m.buddy.PetType == "Corgi" {
-                m.buddy.PetType = "Cat"
-            } else {
+            // Cycle pets: Cat -> Corgi -> Bunny -> Cat
+            switch m.buddy.PetType {
+            case "Cat":
                 m.buddy.PetType = "Corgi"
+            case "Corgi":
+                m.buddy.PetType = "Bunny"
+            default:
+                m.buddy.PetType = "Cat"
             }
             m.statusMessage = "Pet: " + m.buddy.PetType
             return m, nil
@@ -409,7 +454,7 @@ func (m model) View() string {
         ui.WriteString("  Enter     Do action\n")
         ui.WriteString("  ?         Toggle help\n")
         ui.WriteString("  t         Toggle theme\n")
-        ui.WriteString("  p         Switch pet (Cat/Corgi)\n")
+        ui.WriteString("  p         Switch pet (Cat/Corgi/Bunny)\n")
         ui.WriteString("  q         Quit\n\n")
         ui.WriteString("Legend:\n")
         ui.WriteString("  Hunger/Happiness/Energy bars update over time.\n\n")
@@ -422,6 +467,9 @@ func (m model) View() string {
         } else if m.statusMessage != "" {
             ui.WriteString(statusMessageStyle.Render(m.statusMessage))
         } else {
+            // Mood indicator
+            mood, face := computeMood(m.buddy)
+            ui.WriteString(fmt.Sprintf("Mood: %s %s\n\n", mood, face))
             ui.WriteString(renderBar("Hunger", m.buddy.Hunger) + "\n")
             ui.WriteString(renderBar("Happiness", m.buddy.Happiness) + "\n")
             ui.WriteString(renderBar("Energy", m.buddy.Energy))
@@ -467,6 +515,26 @@ func renderBar(label string, value int) string {
 	bar := strings.Repeat("█", value/10) + strings.Repeat("░", 10-value/10)
 
 	return fmt.Sprintf("%s %s", labelStyle.Render(label), barStyle.Render(bar))
+}
+
+// computeMood derives a simple mood label from stats
+func computeMood(b *BitBuddy) (string, string) {
+    if b == nil {
+        return "--", "--"
+    }
+    score := b.Happiness + b.Energy - b.Hunger
+    switch {
+    case score >= 120:
+        return "Ecstatic", ":D"
+    case score >= 60:
+        return "Happy", ":)"
+    case score >= 20:
+        return "Okay", ":|"
+    case score >= -20:
+        return "Tired", "-_-"
+    default:
+        return "Grumpy", ":("
+    }
 }
 
 // tick is a command that sends a tickMsg every 5 seconds.
@@ -517,12 +585,16 @@ func (m model) renderStars(width, height int) []string {
 
 func (m model) renderBuddy() string {
     isDog := m.buddy != nil && strings.EqualFold(m.buddy.PetType, "Corgi")
+    isBun := m.buddy != nil && strings.EqualFold(m.buddy.PetType, "Bunny")
     if m.loading {
         switch m.currentAction {
         case "Feed":
             if isDog {
                 if m.frame%2 == 0 { return dogEat1 }
                 return dogEat2
+            } else if isBun {
+                if m.frame%2 == 0 { return bunEat1 }
+                return bunEat2
             }
             if m.frame%2 == 0 { return catEat1 }
             return catEat2
@@ -530,6 +602,9 @@ func (m model) renderBuddy() string {
             if isDog {
                 if m.frame%2 == 0 { return dogPlay1 }
                 return dogPlay2
+            } else if isBun {
+                if m.frame%2 == 0 { return bunPlay1 }
+                return bunPlay2
             }
             if m.frame%2 == 0 { return catPlay1 }
             return catPlay2
@@ -537,6 +612,9 @@ func (m model) renderBuddy() string {
             if isDog {
                 if m.frame%2 == 0 { return dogSleep1 }
                 return dogSleep2
+            } else if isBun {
+                if m.frame%2 == 0 { return bunSleep1 }
+                return bunSleep2
             }
             if m.frame%2 == 0 { return catSleep1 }
             return catSleep2
@@ -547,12 +625,15 @@ func (m model) renderBuddy() string {
     switch m.frame % 3 {
     case 0:
         if isDog { return dogIdle1 }
+        if isBun { return bunIdle1 }
         return catIdle1
     case 1:
         if isDog { return dogIdle2 }
+        if isBun { return bunIdle2 }
         return catIdle2
     default:
         if isDog { return dogIdle3 }
+        if isBun { return bunIdle3 }
         return catIdle3
     }
 }
